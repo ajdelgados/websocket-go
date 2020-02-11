@@ -11,12 +11,8 @@ import (
 
 //var clients = make(map[*websocket.Conn]bool) // connected clients
 var broadcast = make(chan Message) // broadcast channels
-type clients struct {
-	client *websocket.Conn
-}
 
-var channel = make(map[int]clients)
-var countChannel int = 0
+var channels = make(map[string][]*websocket.Conn)
 
 var upgrader = websocket.Upgrader{}
 
@@ -24,6 +20,7 @@ type Message struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
 	Message  string `json:"message"`
+	Channel  string `json:"channel"`
 }
 
 func main() {
@@ -33,9 +30,37 @@ func main() {
 		c.String(200, "We got Gin")
 	})
 
+	r.GET("/channels", func(c *gin.Context) {
+		var channelsNames []string
+		for k := range channels {
+			channelsNames = append(channelsNames, k)
+		}
+		c.JSON(http.StatusOK, gin.H{"channels": channelsNames})
+	})
+
+	r.POST("/channels", func(c *gin.Context) {
+		type RequestBody struct {
+			Name string `json:"name" binding:"required"`
+		}
+
+		var requestBody RequestBody
+
+		if err := c.BindJSON(&requestBody); err != nil {
+			c.AbortWithStatus(400)
+			return
+		}
+
+		channels[requestBody.Name] = append(channels[requestBody.Name], nil)
+
+		c.JSON(http.StatusCreated, gin.H{
+			"status":  http.StatusCreated,
+			"message": "Created successfully!",
+		})
+	})
+
 	// Configure websocket route
-	r.GET("/ws", func(c *gin.Context) {
-		handleConnections(c.Writer, c.Request)
+	r.GET("/ws/:id", func(c *gin.Context) {
+		handleConnections(c.Writer, c.Request, c.Param("id"))
 	})
 
 	// Start listening for incoming chat messages
@@ -44,7 +69,7 @@ func main() {
 	r.Run("localhost:8000")
 }
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
+func handleConnections(w http.ResponseWriter, r *http.Request, c string) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
 	// Upgrade initial GET request to a websocket
@@ -56,17 +81,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	defer ws.Close()
 
 	// Register our new client
-	//clients[ws] = true
-	var client clients
-	client.client = ws
-	channel[countChannel] = client
-	countChannel++
-	fmt.Println(channel)
+	channels[c] = append(channels[c], ws)
+	fmt.Println(channels)
 
 	for {
 		var msg Message
 		// Read in a new message as JSON and map it to a Message object
 		err := ws.ReadJSON(&msg)
+		fmt.Println(msg)
 		if err != nil {
 			log.Printf("error: %v", err)
 			//delete(clients, ws)
@@ -91,12 +113,24 @@ func handleMessages() {
 				delete(clients, client)
 			}
 		}*/
-		for _, client := range channel {
-			err := client.client.WriteJSON(msg)
-			if err != nil {
-				log.Printf("error: %v", err)
-				client.client.Close()
-				//delete(clients, client)
+
+		for k, client := range channels[msg.Channel] {
+			if client != nil {
+				err := client.WriteJSON(msg)
+				if err != nil {
+					log.Printf("error: %v", err)
+					client.Close()
+					//delete(clients, client)
+					channels[msg.Channel][k] = nil
+				}
+			}
+		}
+
+		for k, client := range channels[msg.Channel] {
+			if client == nil && k < len(channels[msg.Channel]) {
+				channels[msg.Channel][k] = channels[msg.Channel][len(channels[msg.Channel])-1]
+				channels[msg.Channel][len(channels[msg.Channel])-1] = nil
+				channels[msg.Channel] = channels[msg.Channel][:len(channels[msg.Channel])-1]
 			}
 		}
 	}

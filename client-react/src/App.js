@@ -8,7 +8,7 @@ const pushNotificationSupported = serviceWorker.isPushNotificationSupported();
 
 function App() {
   //const [client, setClient] = useState(new W3CWebSocket('wss://ajdelgados.com:8443/ws'))
-  const [client, setClient] = useState(new W3CWebSocket('ws://localhost:8000/ws'))
+  const [client] = useState(new W3CWebSocket('ws://localhost:8000/ws/arturo'))
   const [authorization, setAuthorization] = useState({is: true, message: ""})
   /*serviceWorker.askUserPermission().then(consent => {console.log(
      "Permitido", consent
@@ -32,7 +32,8 @@ function App() {
       JSON.stringify({
         email: "react@react.com",
         username: "react",
-        message: "Desde REact" // Strip out html
+        message: document.getElementById("message").value,
+        channel: "arturo"
     }))
   }
 
@@ -61,6 +62,7 @@ function App() {
         {authorization.is ? 
           <div>
             <button onClick={push}>Pedir permiso</button>
+            <input type="text" id="message" />
             <button onClick={send(client)}>Boton para enviar mensaje</button>
           </div>: authorization.message }
         <a
