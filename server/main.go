@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
@@ -26,25 +27,21 @@ type Message struct {
 }
 
 func main() {
-	// Create a simple file server
-	fs := http.FileServer(http.Dir("../public"))
-	http.Handle("/", fs)
+	r := gin.Default()
+
+	r.GET("/", func(c *gin.Context) {
+		c.String(200, "We got Gin")
+	})
 
 	// Configure websocket route
-	http.HandleFunc("/ws", handleConnections)
+	r.GET("/ws", func(c *gin.Context) {
+		handleConnections(c.Writer, c.Request)
+	})
 
 	// Start listening for incoming chat messages
 	go handleMessages()
 
-	log.Println("http server started on :8000")
-	err := http.ListenAndServe(":8000", nil)
-	/*log.Println("http server started on :8443")
-	certPath := "server.pem"
-	keyPath := "server.key"
-	err := http.ListenAndServeTLS(":8443", certPath, keyPath, nil)*/
-	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
-	}
+	r.Run("localhost:8000")
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
