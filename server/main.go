@@ -9,7 +9,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//var clients = make(map[*websocket.Conn]bool) // connected clients
 var broadcast = make(chan Message) // broadcast channels
 
 var channels = make(map[string][]*websocket.Conn)
@@ -26,8 +25,10 @@ type Message struct {
 func main() {
 	r := gin.Default()
 
+	r.Static("/push", "../public")
+
 	r.GET("/", func(c *gin.Context) {
-		c.String(200, "We got Gin")
+		c.String(200, "It's working")
 	})
 
 	r.GET("/channels", func(c *gin.Context) {
@@ -66,7 +67,8 @@ func main() {
 	// Start listening for incoming chat messages
 	go handleMessages()
 
-	r.Run("localhost:8000")
+	//r.Run("localhost:8000")
+	r.RunTLS(":8443", "server.pem", "server.key")
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request, c string) {
@@ -96,7 +98,6 @@ func handleConnections(w http.ResponseWriter, r *http.Request, c string) {
 		}
 		// Send the newly received message to the broadcast channel
 		broadcast <- msg
-
 	}
 }
 
@@ -105,22 +106,12 @@ func handleMessages() {
 		// Grab the next message from the broadcast channel
 		msg := <-broadcast
 		// Send it out to every client that is currently connected
-		/*for client := range clients {
-			err := client.WriteJSON(msg)
-			if err != nil {
-				log.Printf("error: %v", err)
-				client.Close()
-				delete(clients, client)
-			}
-		}*/
-
 		for k, client := range channels[msg.Channel] {
 			if client != nil {
 				err := client.WriteJSON(msg)
 				if err != nil {
 					log.Printf("error: %v", err)
 					client.Close()
-					//delete(clients, client)
 					channels[msg.Channel][k] = nil
 				}
 			}
