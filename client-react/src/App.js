@@ -7,6 +7,8 @@ import * as serviceWorker from './serviceWorker';
 import ChatRooms from './components/ChatRooms'
 
 const pushNotificationSupported = serviceWorker.isPushNotificationSupported();
+const domain = "localhost:8000"
+const secure = ""
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -38,14 +40,10 @@ function App() {
   useEffect(() => {
     getChannels()
   }, [])
-  /*serviceWorker.askUserPermission().then(consent => {console.log(
-     "Permitido", consent
-  )})
-  serviceWorker.createNotificationSubscription()*/
 
   const classes = useStyles();
 
-  axios.defaults.baseURL = "http://localhost:8000";
+  axios.defaults.baseURL = `http${secure}://${domain}`;
   axios.defaults.headers.common = {
     "Content-Type": "application/json",
   };
@@ -84,7 +82,7 @@ function App() {
     if (clients[channel] == null) {
       setClients(prevState => {
         if (prevState[channel] == null) {
-          let newConnection =  new W3CWebSocket('ws://localhost:8000/ws/'+channel);
+          let newConnection =  new W3CWebSocket(`ws${secure}://${domain}/ws/${channel}`);
 
           newConnection.onopen = () => {
             console.log('WebSocket Client Connected');
