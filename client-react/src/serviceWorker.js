@@ -38,7 +38,7 @@ export function sendNotification(message) {
     badge: "https://spyna.it/icons/android-icon-192x192.png",
     actions: [{ action: "Detail", title: "View", icon: "https://via.placeholder.com/128/ff0000" }]
   };
-  console.log("Verificar en serviceWorker")
+  
   navigator.serviceWorker.ready.then(function(serviceWorker) {
     serviceWorker.showNotification(title, options);
   });
