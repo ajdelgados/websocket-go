@@ -29,8 +29,8 @@ const useStyles = makeStyles(theme => ({
 
 function App() {
   const classes = useStyles();
-  //const [client, setClient] = useState(new W3CWebSocket('wss://ajdelgados.com:8443/ws'))
-  const [client] = useState(new W3CWebSocket('ws://localhost:8000/ws/tttt'))
+  const [client, setClient] = useState(new W3CWebSocket('wss://ajdelgados.com:8443/ws/arturo'))
+  //const [client] = useState(new W3CWebSocket('ws://localhost:8000/ws/arturo'))
   const [authorization, setAuthorization] = useState({is: true, message: ""})
   /*serviceWorker.askUserPermission().then(consent => {console.log(
      "Permitido", consent
@@ -55,7 +55,7 @@ function App() {
         email: "react@react.com",
         username: "react",
         message: document.getElementById("message").value,
-        channel: "tttt"
+        channel: "arturo"
     }))
   }
 

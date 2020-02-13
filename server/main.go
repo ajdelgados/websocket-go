@@ -67,8 +67,8 @@ func main() {
 	// Start listening for incoming chat messages
 	go handleMessages()
 
-	//r.Run("localhost:8000")
-	r.RunTLS(":8443", "server.pem", "server.key")
+	r.Run("localhost:8000")
+	//r.RunTLS(":8443", "server.pem", "server.key")
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request, c string) {

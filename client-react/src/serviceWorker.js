@@ -76,7 +76,7 @@ export function register(config) {
       }
     });
   }
-  return navigator.serviceWorker.register("/sw.js");
+  return navigator.serviceWorker.register("sw.js");
 }
 
 
