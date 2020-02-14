@@ -50,6 +50,8 @@ function App() {
   const [message, setMessage] = useState({popup: false, message: "", type: "error"})
   const [chatRooms, setChatRooms] = useState([])
   const [authorization, setAuthorization] = useState({is: true, message: ""})
+  const [radio, setRadio] = useState(null);
+  const [checked, setChecked] = useState({});
 
   useEffect(() => {
     getChannels()
@@ -63,7 +65,7 @@ function App() {
   };
 
   const send = client => () => {
-    if(clients[client] != null) {
+    if(clients[client] != null && clients[client].readyState === 1) {
       clients[client].send(
         JSON.stringify({
           email: "react@react.com",
@@ -72,6 +74,10 @@ function App() {
           channel: client
       }))
       setMessage({popup: false, message: "", type: "error"});
+    } else if (client != null && clients[client].readyState !== 1) {
+      setRadio(null)
+      setClient(null)
+      setMessage({popup: true, message: "Canal fuera de línea ", type: "error"});
     } else {
       setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
     }
@@ -88,6 +94,9 @@ function App() {
 
   const getChannels = () => {
     axios.get("/channels").then(response => {
+      response.data.channels.forEach(channel => {
+        checked[channel] = false
+      });
       setChatRooms(response.data.channels)
     }).catch(error => {
       setMessage({popup: true, message: "Sin conexión!", type: "error"});
@@ -101,6 +110,8 @@ function App() {
           let newConnection =  new W3CWebSocket(`ws${secure}://${domain}/ws/${channel}`);
 
           newConnection.onopen = () => {
+            newConnection.name = channel
+            console.log(newConnection.name)
             console.log('WebSocket Client Connected');
           };
           newConnection.onmessage = (message) => {
@@ -108,7 +119,12 @@ function App() {
             const data = JSON.parse(message.data)
             serviceWorker.sendNotification(data.message)
           };
-          newConnection.onclose = () => {
+          newConnection.onclose = (clients, client) => event => {
+            console.log(client)
+            console.log(clients[client])
+            if(event.code !== 4000) {
+              console.log("Entro en el if del close")
+            }
             console.log("Closed!")
           }
           return { ...prevState, [channel]: newConnection}
@@ -117,7 +133,11 @@ function App() {
         }
       })
     } else if(close) {
-      clients[channel].close()
+      clients[channel].close(4000)
+      if(clients[channel] === clients[client]) {
+        setRadio(null)
+        setClient(null)
+      }
       delete clients[channel]
     }
   }
@@ -141,12 +161,41 @@ function App() {
     setClient(value)
   }
 
+  const handleRadio = value => () => {
+      handleClient(value)
+      setRadio(value)
+  }
+
   const handleClose = (event, reason) => {
     if (reason === 'clickaway') {
       return;
     }
 
     setMessage({popup: false, message: "", type: "error"});
+  };
+
+  const handleToggle = value => () => {
+    console.log(value)
+    console.log(checked)
+    console.log(checked[value])
+    if(checked[value] === undefined) {
+      checked[value] = true
+      setChecked(checked)
+    } else if(!checked[value]) {
+      /*setChecked(prevState => {
+        prevState[value] = true
+        return prevState
+      })*/
+      connetServer(value)
+    } else {
+      /*setChecked(prevState => {
+        prevState[value] = false
+        return prevState
+      })*/
+      checked[value] = false
+      setChecked(checked)
+      connetServer(value, true)
+    }
   };
 
   return (
@@ -169,7 +218,12 @@ function App() {
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={3}>
           <Paper className={classes.form}>
-            <ChatRooms chatRooms={chatRooms} connetServer={connetServer} handleClient={handleClient} />
+            <ChatRooms
+              chatRooms={chatRooms}
+              handleRadio={handleRadio} 
+              radio={radio}
+              handleToggle={handleToggle}
+              checked={checked} />
           </Paper>
         </Grid>
       </React.Fragment>
