@@ -2,7 +2,18 @@ import React, {useState, useEffect} from 'react';
 import axios from 'axios';
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Paper, TextField, Button, Card, CardHeader, CardContent, CardActions, Divider } from '@material-ui/core';
+import {
+  Grid,
+  Paper,
+  TextField,
+  Button,
+  Card,
+  CardHeader,
+  CardContent,
+  CardActions,
+  Divider,
+  Snackbar } from '@material-ui/core';
+import { Alert } from '@material-ui/lab';
 import * as serviceWorker from './serviceWorker';
 import ChatRooms from './components/ChatRooms'
 
@@ -29,10 +40,14 @@ const useStyles = makeStyles(theme => ({
   },
 }));
 
+function Message(props) {
+  return <Alert elevation={6} variant="filled" {...props} />;
+}
+
 function App() {
   const [clients, setClients] = useState({})
   const [client, setClient] = useState()
-  const [messageError, setMessageError] = useState()
+  const [message, setMessage] = useState({popup: false, message: "", type: "error"})
   const [chatRooms, setChatRooms] = useState([])
   const [authorization, setAuthorization] = useState({is: true, message: ""})
 
@@ -56,9 +71,9 @@ function App() {
           message: document.getElementById("message").value,
           channel: client
       }))
-      setMessageError()
+      setMessage({popup: false, message: "", type: "error"});
     } else {
-      setMessageError("No hay canal suscrito")
+      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
     }
   }
 
@@ -74,6 +89,8 @@ function App() {
   const getChannels = () => {
     axios.get("/channels").then(response => {
       setChatRooms(response.data.channels)
+    }).catch(error => {
+      setMessage({popup: true, message: "Sin conexión!", type: "error"});
     })
   }
 
@@ -124,67 +141,78 @@ function App() {
     setClient(value)
   }
 
+  const handleClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+
+    setMessage({popup: false, message: "", type: "error"});
+  };
+
   return (
-    <div>
-      <Grid container spacing={1}>
-          <React.Fragment>
-            <Grid item xs={12} md={6}>
-              <Card> 
-                <CardHeader
-                  subheader="Create Channel" />
-                <Divider />
-                <CardContent>
-                  <TextField fullWidth id="name" label="Channel name" variant="outlined" className={classes.form}/>
-                </CardContent>
-                <CardActions>
-                  <Button onClick={newChannel} variant="contained" color="primary" className={classes.button}>
-                    Boton para crear channel
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Paper className={classes.form}>
-                <ChatRooms chatRooms={chatRooms} connetServer={connetServer} handleClient={handleClient} />
-              </Paper>
-            </Grid>
-          </React.Fragment>
-          {authorization.is ? 
-          <React.Fragment>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardActions>
-                <Button onClick={push} variant="contained" color="primary" className={classes.button}>
-                  Pedir permiso
-                </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-            <Grid item xs={12} md={6}>
-              <Card>
-                <CardHeader
-                  subheader="Send Message" />
-                <Divider />
-                <CardContent>
-                  <TextField fullWidth error={messageError?true:false} helperText={messageError?messageError:false} id="message" label="Message" variant="outlined" />
-                </CardContent>
-                <CardActions>
-                  <Button onClick={send(client)} variant="contained" color="primary" className={classes.button}>
-                    Boton para enviar mensaje
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          </React.Fragment> : 
-          <React.Fragment>
-            <Grid item xs={12} md={6}>
-              <Paper className={classes.paper}>
-                {authorization.message}
-              </Paper>
-            </Grid>
-          </React.Fragment> }
-      </Grid>
-    </div>
+    <Grid container spacing={1}>
+      <React.Fragment>
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <Card> 
+            <CardHeader
+              subheader="Create Channel" />
+            <Divider />
+            <CardContent>
+              <TextField fullWidth id="name" label="Channel name" variant="outlined" className={classes.form}/>
+            </CardContent>
+            <CardActions>
+              <Button onClick={newChannel} variant="contained" color="primary" className={classes.button}>
+                Create
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <Paper className={classes.form}>
+            <ChatRooms chatRooms={chatRooms} connetServer={connetServer} handleClient={handleClient} />
+          </Paper>
+        </Grid>
+      </React.Fragment>
+      {authorization.is ? 
+      <React.Fragment>
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <Card>
+            <CardActions>
+            <Button onClick={push} variant="contained" color="primary" className={classes.button}>
+              Ask permission
+            </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <Card>
+            <CardHeader
+              subheader="Send Message" />
+            <Divider />
+            <CardContent>
+              <TextField fullWidth id="message" label="Message" variant="outlined" />
+            </CardContent>
+            <CardActions>
+              <Button onClick={send(client)} variant="contained" color="primary" className={classes.button}>
+                Send message
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      </React.Fragment> : 
+      <React.Fragment>
+        <Grid item xs={12}>
+          <Paper className={classes.paper}>
+            {authorization.message}
+          </Paper>
+        </Grid>
+      </React.Fragment> }
+      <Snackbar open={message.popup} autoHideDuration={5000} onClose={handleClose}>
+        <Message onClose={handleClose} severity={message.type}>
+          {message.message}
+        </Message>
+      </Snackbar>
+    </Grid>
   );
 }
 
