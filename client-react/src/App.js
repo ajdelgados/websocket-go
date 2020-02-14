@@ -2,7 +2,7 @@ import React, {useState, useEffect} from 'react';
 import axios from 'axios';
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import { makeStyles } from '@material-ui/core/styles';
-import { Grid, Paper, TextField, Button } from '@material-ui/core';
+import { Grid, Paper, TextField, Button, Card, CardHeader, CardContent, CardActions, Divider } from '@material-ui/core';
 import * as serviceWorker from './serviceWorker';
 import ChatRooms from './components/ChatRooms'
 
@@ -22,7 +22,6 @@ const useStyles = makeStyles(theme => ({
   form: {
     '& .MuiTextField-root': {
       margin: theme.spacing(1),
-      width: 200,
     },
   },
   button: {
@@ -126,23 +125,25 @@ function App() {
   }
 
   return (
-    <div className={classes.root}>
+    <div>
       <Grid container spacing={1}>
-        <Grid container item xs={12} spacing={3}>
           <React.Fragment>
-            <Grid item xs={6}>
-              <Paper className={classes.form}>
-                <div>
-                  <TextField id="name" label="Channel name" variant="outlined" />
-                </div>
-                <div>
+            <Grid item xs={12} md={6}>
+              <Card> 
+                <CardHeader
+                  subheader="Create Channel" />
+                <Divider />
+                <CardContent>
+                  <TextField fullWidth id="name" label="Channel name" variant="outlined" className={classes.form}/>
+                </CardContent>
+                <CardActions>
                   <Button onClick={newChannel} variant="contained" color="primary" className={classes.button}>
                     Boton para crear channel
                   </Button>
-                </div>
-              </Paper>
+                </CardActions>
+              </Card>
             </Grid>
-            <Grid item xs={6}>
+            <Grid item xs={12} md={6}>
               <Paper className={classes.form}>
                 <ChatRooms chatRooms={chatRooms} connetServer={connetServer} handleClient={handleClient} />
               </Paper>
@@ -150,32 +151,38 @@ function App() {
           </React.Fragment>
           {authorization.is ? 
           <React.Fragment>
-            <Grid item xs={6}>
-              <Paper className={classes.form}>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardActions>
                 <Button onClick={push} variant="contained" color="primary" className={classes.button}>
                   Pedir permiso
                 </Button>
-              </Paper>
+                </CardActions>
+              </Card>
             </Grid>
-            <Grid item xs={6}>
-              <Paper className={classes.form}>
-                  <div><TextField error={messageError?true:false} helperText={messageError?messageError:false} id="message" label="Message" variant="outlined" /></div>
-                  <div>
-                    <Button onClick={send(client)} variant="contained" color="primary" className={classes.button}>
-                      Boton para enviar mensaje
-                    </Button>
-                  </div>
-              </Paper>
+            <Grid item xs={12} md={6}>
+              <Card>
+                <CardHeader
+                  subheader="Send Message" />
+                <Divider />
+                <CardContent>
+                  <TextField fullWidth error={messageError?true:false} helperText={messageError?messageError:false} id="message" label="Message" variant="outlined" />
+                </CardContent>
+                <CardActions>
+                  <Button onClick={send(client)} variant="contained" color="primary" className={classes.button}>
+                    Boton para enviar mensaje
+                  </Button>
+                </CardActions>
+              </Card>
             </Grid>
           </React.Fragment> : 
           <React.Fragment>
-            <Grid item xs={6}>
+            <Grid item xs={12} md={6}>
               <Paper className={classes.paper}>
                 {authorization.message}
               </Paper>
             </Grid>
           </React.Fragment> }
-        </Grid>
       </Grid>
     </div>
   );
