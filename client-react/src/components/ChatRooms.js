@@ -1,4 +1,4 @@
-import React from "react"
+import React, {useEffect} from "react"
 import { makeStyles } from '@material-ui/core/styles';
 import { Card, CardHeader, Divider, FormControl, RadioGroup, List } from '@material-ui/core';
 import ChatRoom from './ChatRoom'
@@ -12,6 +12,9 @@ const useStyles = makeStyles(theme => ({
 }));
 
 const ChatRooms = props => {
+    useEffect(() => {
+        console.log("inside useEffect")
+    }, [props.force])
     const classes = useStyles();
 
     return (
@@ -25,10 +28,10 @@ const ChatRooms = props => {
                         {props.chatRooms ? props.chatRooms.map(element => {
                             return <ChatRoom 
                               key={element}
+                              item={element}
+                              checked={props.checked}
                               handleRadio={props.handleRadio}
-                              item={element} 
-                              handleToggle={props.handleToggle}
-                              checked={props.checked} />
+                              handleToggle={props.handleToggle} />
                             }):<div className={classes.paper}>Without chat rooms</div>
                         }
                     </List>

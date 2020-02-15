@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import axios from 'axios';
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import { makeStyles } from '@material-ui/core/styles';
@@ -16,6 +16,7 @@ import {
 import { Alert } from '@material-ui/lab';
 import * as serviceWorker from './serviceWorker';
 import ChatRooms from './components/ChatRooms'
+import { CheckedContext } from "./context/CheckedContext";
 
 const pushNotificationSupported = serviceWorker.isPushNotificationSupported();
 const domain = "localhost:8000"
@@ -51,7 +52,8 @@ function App() {
   const [chatRooms, setChatRooms] = useState([])
   const [authorization, setAuthorization] = useState({is: true, message: ""})
   const [radio, setRadio] = useState(null);
-  const [checked, setChecked] = useState({});
+  const [checked, setChecked] = useContext(CheckedContext);
+  const [force, setForce] = useState(0)
 
   useEffect(() => {
     getChannels()
@@ -74,7 +76,17 @@ function App() {
           channel: client
       }))
       setMessage({popup: false, message: "", type: "error"});
+    } else if(client == null) {
+      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
+    } else if (clients[client] == null) {
+      checked[client] = []
+      setClient(null)
+      setRadio(null)
+      setChecked(checked)
+      setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
     } else if (client != null && clients[client].readyState !== 1) {
+      checked[client] = []
+      setChecked(checked)
       setRadio(null)
       setClient(null)
       setMessage({popup: true, message: "Canal fuera de línea ", type: "error"});
@@ -94,10 +106,17 @@ function App() {
 
   const getChannels = () => {
     axios.get("/channels").then(response => {
-      response.data.channels.forEach(channel => {
-        checked[channel] = false
-      });
-      setChatRooms(response.data.channels)
+      if(response.data.channels != null) {
+        let newChannels = {}
+        response.data.channels.forEach(channel => {
+          newChannels[channel] = []
+        });
+        Object.assign(newChannels, checked)
+        setChecked(newChannels)
+        setChatRooms(response.data.channels)
+      } else {
+        setChatRooms(false)
+      }
     }).catch(error => {
       setMessage({popup: true, message: "Sin conexión!", type: "error"});
     })
@@ -111,7 +130,6 @@ function App() {
 
           newConnection.onopen = () => {
             newConnection.name = channel
-            console.log(newConnection.name)
             console.log('WebSocket Client Connected');
           };
           newConnection.onmessage = (message) => {
@@ -157,13 +175,19 @@ function App() {
     } else setAuthorization({is: false, message: "No soportado :("})
   }
 
-  const handleClient = value => {
-    setClient(value)
-  }
-
   const handleRadio = value => () => {
-      handleClient(value)
+    if(clients[value] != null && clients[value].readyState === 1) {
+      setClient(value)
       setRadio(value)
+    } else {
+      checked[value] = []
+      if(client === value) {
+        setClient(null)
+        setRadio(null)
+      }
+      setChecked(checked)
+      setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
+    }
   }
 
   const handleClose = (event, reason) => {
@@ -175,27 +199,19 @@ function App() {
   };
 
   const handleToggle = value => () => {
-    console.log(value)
-    console.log(checked)
-    console.log(checked[value])
-    if(checked[value] === undefined) {
-      checked[value] = true
-      setChecked(checked)
-    } else if(!checked[value]) {
-      /*setChecked(prevState => {
-        prevState[value] = true
-        return prevState
-      })*/
+    const currentIndex = checked[value].indexOf(value);
+    const newChecked = [...checked[value]];
+
+    if (currentIndex === -1) {
+      newChecked.push(value);
       connetServer(value)
     } else {
-      /*setChecked(prevState => {
-        prevState[value] = false
-        return prevState
-      })*/
-      checked[value] = false
-      setChecked(checked)
+      newChecked.splice(currentIndex, 1);
       connetServer(value, true)
     }
+    checked[value] = newChecked
+    setChecked(checked);
+    setForce(force+1)
   };
 
   return (
@@ -219,11 +235,12 @@ function App() {
         <Grid item xs={12} sm={6} md={4} lg={3}>
           <Paper className={classes.form}>
             <ChatRooms
+              force={force}
               chatRooms={chatRooms}
-              handleRadio={handleRadio} 
               radio={radio}
-              handleToggle={handleToggle}
-              checked={checked} />
+              checked={checked}
+              handleRadio={handleRadio} 
+              handleToggle={handleToggle} />
           </Paper>
         </Grid>
       </React.Fragment>
