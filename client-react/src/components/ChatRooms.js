@@ -12,9 +12,6 @@ const useStyles = makeStyles(theme => ({
 }));
 
 const ChatRooms = props => {
-    useEffect(() => {
-        console.log("inside useEffect")
-    }, [props.force])
     const classes = useStyles();
 
     return (
@@ -29,7 +26,8 @@ const ChatRooms = props => {
                             return <ChatRoom 
                               key={element}
                               item={element}
-                              checked={props.checked}
+                              checked={props.checked[element].indexOf(element)}
+                              disabled={props.checked[element][0]}
                               handleRadio={props.handleRadio}
                               handleToggle={props.handleToggle} />
                             }):<div className={classes.paper}>Without chat rooms</div>

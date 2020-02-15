@@ -79,13 +79,13 @@ function App() {
     } else if(client == null) {
       setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
     } else if (clients[client] == null) {
-      checked[client] = []
+      checked[client] = [false]
       setClient(null)
       setRadio(null)
       setChecked(checked)
       setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
     } else if (client != null && clients[client].readyState !== 1) {
-      checked[client] = []
+      checked[client] = [false]
       setChecked(checked)
       setRadio(null)
       setClient(null)
@@ -109,7 +109,7 @@ function App() {
       if(response.data.channels != null) {
         let newChannels = {}
         response.data.channels.forEach(channel => {
-          newChannels[channel] = []
+          newChannels[channel] = [false]
         });
         Object.assign(newChannels, checked)
         setChecked(newChannels)
@@ -129,14 +129,27 @@ function App() {
           let newConnection =  new W3CWebSocket(`ws${secure}://${domain}/ws/${channel}`);
 
           newConnection.onopen = () => {
+            checked[channel][0] = false
             newConnection.name = channel
             console.log('WebSocket Client Connected');
+            setChecked(checked)
+            setForce(force+1)
           };
           newConnection.onmessage = (message) => {
             console.log(message.data);
             const data = JSON.parse(message.data)
             serviceWorker.sendNotification(data.message)
           };
+          newConnection.onerror = () => {
+            setMessage({popup: true, message: "Sin conexión al servidor!", type: "error"});
+            checked[channel][0] = false
+            checked[channel].splice(1, 1);
+            clients[channel] = null
+            console.error("WebSocket error observed");
+            setChecked(checked)
+            setClients(clients)
+            setForce(force+1)
+          }
           newConnection.onclose = (clients, client) => event => {
             console.log(client)
             console.log(clients[client])
@@ -157,6 +170,13 @@ function App() {
         setClient(null)
       }
       delete clients[channel]
+    } else if(clients[channel].readyState !== 1) {
+      checked[channel][0] = false
+      checked[channel].splice(1, 1);
+      clients[channel] = null
+      setChecked(checked)
+      setClients(clients)
+      setForce(force+1)
     }
   }
 
@@ -180,7 +200,7 @@ function App() {
       setClient(value)
       setRadio(value)
     } else {
-      checked[value] = []
+      checked[value] = [false]
       if(client === value) {
         setClient(null)
         setRadio(null)
@@ -204,14 +224,18 @@ function App() {
 
     if (currentIndex === -1) {
       newChecked.push(value);
+      newChecked[0] = true;
+      checked[value] = newChecked
+      setChecked(checked);
       connetServer(value)
     } else {
+      newChecked[0] = false;
       newChecked.splice(currentIndex, 1);
+      checked[value] = newChecked
+      setChecked(checked);
+      setForce(force+1)
       connetServer(value, true)
     }
-    checked[value] = newChecked
-    setChecked(checked);
-    setForce(force+1)
   };
 
   return (
@@ -235,7 +259,6 @@ function App() {
         <Grid item xs={12} sm={6} md={4} lg={3}>
           <Paper className={classes.form}>
             <ChatRooms
-              force={force}
               chatRooms={chatRooms}
               radio={radio}
               checked={checked}

@@ -1,10 +1,27 @@
 import React, {useContext} from "react"
-import { ListItem, ListItemIcon, FormControlLabel, Radio, ListItemText, ListItemSecondaryAction, Checkbox } from '@material-ui/core';
-import { CheckedContext } from "../context/CheckedContext";
+import {
+  makeStyles,
+  ListItem,
+  ListItemIcon,
+  FormControlLabel,
+  Radio,
+  ListItemText,
+  ListItemSecondaryAction,
+  Checkbox,
+  CircularProgress } from '@material-ui/core';
+
+const useStyles = makeStyles(theme => ({
+  checkProgress: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginTop: -12,
+    marginLeft: -18,
+  },
+}))
 
 const ChatRoom = props => {
-
-  const [checked] = useContext(CheckedContext);
+  const classes = useStyles();
 
   return (
     <ListItem onClick={props.handleRadio(props.item)} role={undefined} dense button >
@@ -20,11 +37,13 @@ const ChatRoom = props => {
         <Checkbox
           onChange={props.handleToggle(props.item)}
           edge="start"
-          checked={checked[props.item].indexOf(props.item) !== -1}
+          checked={props.checked !== -1}
           tabIndex={-1}
+          disabled={props.disabled}
           disableRipple
           inputProps={{ 'aria-labelledby': props.item }}
         />
+        {props.disabled && <CircularProgress size={24} className={classes.checkProgress} />}
       </ListItemSecondaryAction>
     </ListItem>
   )
