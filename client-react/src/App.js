@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useContext} from 'react';
+import React, {useState, useEffect} from 'react';
 import axios from 'axios';
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import { makeStyles } from '@material-ui/core/styles';
@@ -16,11 +16,10 @@ import {
 import { Alert } from '@material-ui/lab';
 import * as serviceWorker from './serviceWorker';
 import ChatRooms from './components/ChatRooms'
-import { CheckedContext } from "./context/CheckedContext";
 
 const pushNotificationSupported = serviceWorker.isPushNotificationSupported();
 const domain = "localhost:8000"
-const secure = ""
+const secure = "" // s or empty
 
 const useStyles = makeStyles(theme => ({
   root: {
@@ -47,17 +46,17 @@ function Message(props) {
 
 function App() {
   const [clients, setClients] = useState({})
-  const [client, setClient] = useState()
+  const [client, setClient] = useState({name: null})
   const [message, setMessage] = useState({popup: false, message: "", type: "error"})
   const [chatRooms, setChatRooms] = useState([])
   const [authorization, setAuthorization] = useState({is: true, message: ""})
   const [radio, setRadio] = useState(null);
-  const [checked, setChecked] = useContext(CheckedContext);
+  const [checked, setChecked] = useState([]);
   const [force, setForce] = useState(0)
 
   useEffect(() => {
     getChannels()
-  }, [])
+  },[])
 
   const classes = useStyles();
 
@@ -65,44 +64,6 @@ function App() {
   axios.defaults.headers.common = {
     "Content-Type": "application/json",
   };
-
-  const send = client => () => {
-    if(clients[client] != null && clients[client].readyState === 1) {
-      clients[client].send(
-        JSON.stringify({
-          email: "react@react.com",
-          username: "react",
-          message: document.getElementById("message").value,
-          channel: client
-      }))
-      setMessage({popup: false, message: "", type: "error"});
-    } else if(client == null) {
-      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
-    } else if (clients[client] == null) {
-      checked[client] = [false]
-      setClient(null)
-      setRadio(null)
-      setChecked(checked)
-      setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
-    } else if (client != null && clients[client].readyState !== 1) {
-      checked[client] = [false]
-      setChecked(checked)
-      setRadio(null)
-      setClient(null)
-      setMessage({popup: true, message: "Canal fuera de línea ", type: "error"});
-    } else {
-      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
-    }
-  }
-
-  const newChannel = () => {
-    axios.post("/channels", JSON.stringify({name: document.getElementById("name").value})).then(response => {
-      if(response.status === 201){
-        document.getElementById("name").value = ""
-        getChannels()
-      }
-    })
-  }
 
   const getChannels = () => {
     axios.get("/channels").then(response => {
@@ -118,7 +79,50 @@ function App() {
         setChatRooms(false)
       }
     }).catch(error => {
+      setChatRooms(false)
       setMessage({popup: true, message: "Sin conexión!", type: "error"});
+    })
+  }
+
+  const send = () => {
+    if(clients[client.name] != null && clients[client.name].readyState === 1) {
+      clients[client.name].send(
+        JSON.stringify({
+          email: "react@react.com",
+          username: "react",
+          message: document.getElementById("message").value,
+          channel: client.name
+      }))
+      setMessage({popup: false, message: "", type: "error"});
+    } else if(client.name == null) {
+      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
+    } else if (clients[client.name] == null) {
+      checked[client.name] = [false]
+      client.name = null
+      setClient(client)
+      setRadio(null)
+      setChecked(checked)
+      setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
+    } else if (client.name != null && clients[client.name].readyState !== 1) {
+      checked[client.name] = [false]
+      client.name = null
+      setChecked(checked)
+      setRadio(null)
+      setClient(client)
+      setMessage({popup: true, message: "Canal fuera de línea ", type: "error"});
+    } else {
+      setMessage({popup: true, message: "No hay canal suscrito o válido", type: "error"});
+    }
+  }
+
+  const newChannel = () => {
+    axios.post("/channels", JSON.stringify({name: document.getElementById("name").value})).then(response => {
+      if(response.status === 201){
+        document.getElementById("name").value = ""
+        getChannels()
+      }
+    }).catch(() =>{
+      setMessage({popup: true, message: "Error al enviar información al servidor", type: "error"});
     })
   }
 
@@ -141,24 +145,19 @@ function App() {
             serviceWorker.sendNotification(data.message)
           };
           newConnection.onerror = () => {
+            shutDownChannel(channel)
             setMessage({popup: true, message: "Sin conexión al servidor!", type: "error"});
-            checked[channel][0] = false
-            checked[channel].splice(1, 1);
-            clients[channel] = null
             console.error("WebSocket error observed");
-            setChecked(checked)
-            setClients(clients)
-            setForce(force+1)
           }
-          newConnection.onclose = (clients, client) => event => {
-            console.log(client)
-            console.log(clients[client])
+          newConnection.onclose = event => {
+            shutDownChannel(event.target.name)
             if(event.code !== 4000) {
-              console.log("Entro en el if del close")
+              setMessage({popup: true, message: "Error conexión al servidor!", type: "error"});
             }
             console.log("Closed!")
           }
-          return { ...prevState, [channel]: newConnection}
+          prevState[channel] = newConnection
+          return prevState
         } else {
           return prevState
         }
@@ -166,8 +165,9 @@ function App() {
     } else if(close) {
       clients[channel].close(4000)
       if(clients[channel] === clients[client]) {
+        client.name = null
         setRadio(null)
-        setClient(null)
+        setClient(client)
       }
       delete clients[channel]
     } else if(clients[channel].readyState !== 1) {
@@ -178,6 +178,24 @@ function App() {
       setClients(clients)
       setForce(force+1)
     }
+  }
+
+  const shutDownChannel = value => {
+    if(value === client.name) {
+      client.name = null
+      setRadio(null)
+      setClient(client)
+    }
+    if(checked[value]) {
+      checked[value][0] = false
+      checked[value].splice(1, 1);
+      setForce(prev=>{
+        setChecked(checked)
+        return prev+1
+      })
+    }
+    clients[value] = null
+    setClients(clients)
   }
 
   const push = () => {
@@ -197,12 +215,14 @@ function App() {
 
   const handleRadio = value => () => {
     if(clients[value] != null && clients[value].readyState === 1) {
-      setClient(value)
+      client.name = value
+      setClient(client)
       setRadio(value)
     } else {
       checked[value] = [false]
       if(client === value) {
-        setClient(null)
+        client.name = null
+        setClient(client)
         setRadio(null)
       }
       setChecked(checked)
@@ -229,11 +249,6 @@ function App() {
       setChecked(checked);
       connetServer(value)
     } else {
-      newChecked[0] = false;
-      newChecked.splice(currentIndex, 1);
-      checked[value] = newChecked
-      setChecked(checked);
-      setForce(force+1)
       connetServer(value, true)
     }
   };
@@ -287,7 +302,7 @@ function App() {
               <TextField fullWidth id="message" label="Message" variant="outlined" />
             </CardContent>
             <CardActions>
-              <Button onClick={send(client)} variant="contained" color="primary" className={classes.button}>
+              <Button onClick={send} variant="contained" color="primary" className={classes.button}>
                 Send message
               </Button>
             </CardActions>

@@ -1,4 +1,4 @@
-import React, {useEffect} from "react"
+import React from "react"
 import { makeStyles } from '@material-ui/core/styles';
 import { Card, CardHeader, Divider, FormControl, RadioGroup, List } from '@material-ui/core';
 import ChatRoom from './ChatRoom'
@@ -23,7 +23,7 @@ const ChatRooms = props => {
                 <RadioGroup aria-label="channel" name="channel" value={props.radio}>
                     <List>
                         {props.chatRooms ? props.chatRooms.map(element => {
-                            return <ChatRoom 
+                            return <ChatRoom
                               key={element}
                               item={element}
                               checked={props.checked[element].indexOf(element)}
