@@ -12,24 +12,22 @@ const useStyles = makeStyles(theme => ({
 }));
 
 const ChatRooms = props => {
+    const { channels, channelsDispatch } = props
     const classes = useStyles();
-
     return (
         <Card> 
             <CardHeader
                 subheader="Channels" />
             <Divider />
             <FormControl fullWidth component="fieldset">
-                <RadioGroup aria-label="channel" name="channel" value={props.radio}>
+                <RadioGroup aria-label="channel" name="channel" value={channels.client}>
                     <List>
-                        {props.chatRooms ? props.chatRooms.map(element => {
+                        {channels.channels ? Object.keys(channels.channels).map(channel => {
                             return <ChatRoom
-                              key={element}
-                              item={element}
-                              checked={props.checked[element].indexOf(element)}
-                              disabled={props.checked[element][0]}
-                              handleRadio={props.handleRadio}
-                              handleToggle={props.handleToggle} />
+                              key={channel}
+                              item={channel}
+                              channelsDispatch={channelsDispatch}
+                              actived={channels.channels[channel]} />
                             }):<div className={classes.paper}>Without chat rooms</div>
                         }
                     </List>

@@ -21,29 +21,30 @@ const useStyles = makeStyles(theme => ({
 }))
 
 const ChatRoom = props => {
+  const { item, channelsDispatch, actived } = props
   const classes = useStyles();
 
   return (
-    <ListItem onClick={props.handleRadio(props.item)} role={undefined} dense button >
+    <ListItem onClick={() => channelsDispatch({type: "select"})} role={undefined} dense button >
       <ListItemIcon>
         <FormControlLabel
-          onClick={props.handleRadio(props.item)}
-          value={props.item}
+          onClick={() => channelsDispatch({type: "select"})}
+          value={item}
           control={<Radio color="primary" />}
         />
       </ListItemIcon>
-      <ListItemText id={props.item} primary={props.item} />
+      <ListItemText id={item} primary={item} />
       <ListItemSecondaryAction>
         <Checkbox
-          onChange={props.handleToggle(props.item)}
           edge="start"
-          checked={props.checked !== -1}
           tabIndex={-1}
-          disabled={props.disabled}
           disableRipple
-          inputProps={{ 'aria-labelledby': props.item }}
+          onChange={() => channelsDispatch({type: "subscribe", channel: item})}
+          checked={actived.indexOf(item) !== -1}
+          disabled={actived[0]}
+          inputProps={{ 'aria-labelledby': item }}
         />
-        {props.disabled && <CircularProgress size={24} className={classes.checkProgress} />}
+        {actived[0] && <CircularProgress size={24} className={classes.checkProgress} />}
       </ListItemSecondaryAction>
     </ListItem>
   )
