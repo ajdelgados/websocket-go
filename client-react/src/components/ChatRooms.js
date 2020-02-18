@@ -12,7 +12,7 @@ const useStyles = makeStyles(theme => ({
 }));
 
 const ChatRooms = props => {
-    const { channels, channelsDispatch } = props
+    const { channels, channelsDispatch, setMessage, serviceWorker } = props
     const classes = useStyles();
     return (
         <Card> 
@@ -27,6 +27,8 @@ const ChatRooms = props => {
                               key={channel}
                               item={channel}
                               channelsDispatch={channelsDispatch}
+                              setMessage={setMessage}
+                              serviceWorker={serviceWorker}
                               actived={channels.channels[channel]} />
                             }):<div className={classes.paper}>Without chat rooms</div>
                         }

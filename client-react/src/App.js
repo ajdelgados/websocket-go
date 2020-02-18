@@ -45,55 +45,42 @@ function Message(props) {
 }
 
 const channelsInit = {
-  client: null,           //Client and radio
-  channels: false,           //ChatRooms and Checked
+  client: null,          //Client and radio
+  channels: false,       //ChatRooms and Checked
   webSockets: {}         //Clients
 }
 
 function channelsReducer(state, action) {
   switch (action.type) {
     case 'setChannels':
-      let newChannels = {}
-      action.channels.forEach(channel => {
-        newChannels[channel] = [false]
-      });
-      Object.assign(newChannels, state.channels)
-      state.channels = newChannels
+      if(action.channels) {
+        let newChannels = {}
+        action.channels.forEach(channel => {
+          newChannels[channel] = [false]
+        });
+        Object.assign(newChannels, state.channels)
+        state.channels = newChannels
+      }
       return {...state};
     
     case 'subscribe':
-      if (state.channels[action.channel][0]){
-
+      if (state.webSockets[action.channel] && state.webSockets[action.channel].readyState === 1) {
+        state.webSockets[action.channel].close(4000)
       } else {
-
         let newConnection =  new W3CWebSocket(`ws${secure}://${domain}/ws/${action.channel}`);
         newConnection.onopen = () => {
-          state.channels[action.channel][0] = false
-          newConnection.name = action.channel
+          action.channelsDispatch({type: 'websocketOpen', channel: action.channel})
           console.log('WebSocket Client Connected');
         };
         newConnection.onmessage = message => {
           console.log(message.data);
           const data = JSON.parse(message.data)
-          //serviceWorker.sendNotification(data.message)
+          action.serviceWorker.sendNotification(data.message)
         };
-        newConnection.onerror = () => {
-          if(action.channel === state.client) 
-            state.client = null
-          state.channels[action.channel][0] = false
-          state.channels[action.channel].splice(1, 1);
-          state.webSockets[action.channel] = null
-          //setMessage({popup: true, message: "Sin conexión al servidor!", type: "error"});
-          console.error("WebSocket error observed");
-        }
         newConnection.onclose = event => {
-          if(action.channel === state.client) 
-            state.client = null
-          state.channels[action.channel][0] = false
-          state.channels[action.channel].splice(1, 1);
-          state.webSockets[action.channel] = null
+          action.channelsDispatch({type: 'websocketClose', channel: action.channel})
           if(event.code !== 4000) {
-            //setMessage({popup: true, message: "Error conexión al servidor!", type: "error"});
+            action.setMessage({popup: true, message: "Error conexión al servidor!", type: "error"});
           }
           console.log("Closed!")
         }
@@ -101,10 +88,23 @@ function channelsReducer(state, action) {
         state.channels[action.channel].push(action.channel);
         state.webSockets[action.channel] = newConnection
       }
-      console.log("suscribe")
       return {...state}
     case 'select':
-      console.log("select")
+      if(state.webSockets[action.channel] && state.webSockets[action.channel].readyState === 1)
+        state.client = action.channel
+      else if(state.webSockets[action.channel]) {
+        state.webSockets[action.channel].close()
+      }
+      return {...state}
+    case 'websocketOpen':
+      state.channels[action.channel][0] = false
+      return {...state}
+    case 'websocketClose':
+      if(action.channel === state.client) 
+        state.client = null
+      state.channels[action.channel][0] = false
+      state.channels[action.channel].splice(1, 1);
+      state.webSockets[action.channel] = null
       return {...state}
     default:
       throw new Error();
@@ -159,6 +159,38 @@ function App() {
     setMessage({popup: false, message: "", type: "error"});
   };
 
+  const push = () => {
+    if(pushNotificationSupported) {
+      if(serviceWorker.isPushNotificationSupported()) {
+        setAuthorization({is: true, message: ""})
+        serviceWorker.register().then(() => {
+          serviceWorker.askUserPermission().then(() => {
+            serviceWorker.createNotificationSubscription().then(() => {
+
+            })
+          })
+        })
+      }
+    } else setAuthorization({is: false, message: "No soportado :("})
+  }
+
+  const send = () => {
+    if(channels.webSockets[channels.client] && channels.webSockets[channels.client].readyState === 1) {
+      channels.webSockets[channels.client].send(
+        JSON.stringify({
+          email: "react@react.com",
+          username: "react",
+          message: document.getElementById("message").value,
+          channel: channels.client
+      }))
+      setMessage({popup: false, message: "", type: "error"});
+    } else if(channels.client == null) {
+      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
+    } else {
+      setMessage({popup: true, message: "No hay canal válido", type: "error"});
+    }
+  }
+
   return (
     <Grid container spacing={1}>
       <React.Fragment>
@@ -181,10 +213,46 @@ function App() {
           <Paper className={classes.form}>
             <ChatRooms
               channels={channels}
-              channelsDispatch={channelsDispatch} />
+              channelsDispatch={channelsDispatch}
+              serviceWorker={serviceWorker}
+              setMessage={setMessage} />
           </Paper>
         </Grid>
       </React.Fragment>
+      {authorization.is ? 
+      <React.Fragment>
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <Card>
+            <CardActions>
+            <Button onClick={push} variant="contained" color="primary" className={classes.button}>
+              Ask permission
+            </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={3}>
+          <Card>
+            <CardHeader
+              subheader="Send Message" />
+            <Divider />
+            <CardContent>
+              <TextField fullWidth id="message" label="Message" variant="outlined" />
+            </CardContent>
+            <CardActions>
+              <Button onClick={send} variant="contained" color="primary" className={classes.button}>
+                Send message
+              </Button>
+            </CardActions>
+          </Card>
+        </Grid>
+      </React.Fragment> : 
+      <React.Fragment>
+        <Grid item xs={12}>
+          <Paper className={classes.paper}>
+            {authorization.message}
+          </Paper>
+        </Grid>
+      </React.Fragment> }
       <Snackbar open={message.popup} autoHideDuration={5000} onClose={handleClose}>
         <Message onClose={handleClose} severity={message.type}>
           {message.message}

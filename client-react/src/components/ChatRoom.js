@@ -21,14 +21,14 @@ const useStyles = makeStyles(theme => ({
 }))
 
 const ChatRoom = props => {
-  const { item, channelsDispatch, actived } = props
+  const { item, channelsDispatch, actived, setMessage, serviceWorker } = props
   const classes = useStyles();
 
   return (
-    <ListItem onClick={() => channelsDispatch({type: "select"})} role={undefined} dense button >
+    <ListItem onClick={() => channelsDispatch({type: "select", channel: item})} role={undefined} dense button >
       <ListItemIcon>
         <FormControlLabel
-          onClick={() => channelsDispatch({type: "select"})}
+          onClick={() => channelsDispatch({type: "select", channel: item})}
           value={item}
           control={<Radio color="primary" />}
         />
@@ -39,7 +39,13 @@ const ChatRoom = props => {
           edge="start"
           tabIndex={-1}
           disableRipple
-          onChange={() => channelsDispatch({type: "subscribe", channel: item})}
+          onChange={() => channelsDispatch({
+            type: "subscribe", 
+            channel: item, 
+            channelsDispatch: channelsDispatch,
+            setMessage: setMessage,
+            serviceWorker: serviceWorker
+          })}
           checked={actived.indexOf(item) !== -1}
           disabled={actived[0]}
           inputProps={{ 'aria-labelledby': item }}
