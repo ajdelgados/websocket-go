@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useReducer} from 'react';
 import axios from 'axios';
 import { w3cwebsocket as W3CWebSocket } from "websocket";
 import { makeStyles } from '@material-ui/core/styles';
@@ -44,15 +44,77 @@ function Message(props) {
   return <Alert elevation={6} variant="filled" {...props} />;
 }
 
+const channelsInit = {
+  client: null,          //Client and radio
+  channels: false,       //ChatRooms and Checked
+  webSockets: {}         //Clients
+}
+
+function channelsReducer(state, action) {
+  switch (action.type) {
+    case 'setChannels':
+      if(action.channels) {
+        let newChannels = {}
+        action.channels.forEach(channel => {
+          newChannels[channel] = [false]
+        });
+        Object.assign(newChannels, state.channels)
+        state.channels = newChannels
+      }
+      return {...state};
+    
+    case 'subscribe':
+      if (state.webSockets[action.channel] && state.webSockets[action.channel].readyState === 1) {
+        state.webSockets[action.channel].close(4000)
+      } else {
+        let newConnection =  new W3CWebSocket(`ws${secure}://${domain}/ws/${action.channel}`);
+        newConnection.onopen = () => {
+          action.channelsDispatch({type: 'websocketOpen', channel: action.channel})
+          console.log('WebSocket Client Connected');
+        };
+        newConnection.onmessage = message => {
+          console.log(message.data);
+          const data = JSON.parse(message.data)
+          action.serviceWorker.sendNotification(data.message)
+        };
+        newConnection.onclose = event => {
+          action.channelsDispatch({type: 'websocketClose', channel: action.channel})
+          if(event.code !== 4000) {
+            action.setMessage({popup: true, message: "Error conexión al servidor!", type: "error"});
+          }
+          console.log("Closed!")
+        }
+        state.channels[action.channel][0] = true
+        state.channels[action.channel].push(action.channel);
+        state.webSockets[action.channel] = newConnection
+      }
+      return {...state}
+    case 'select':
+      if(state.webSockets[action.channel] && state.webSockets[action.channel].readyState === 1)
+        state.client = action.channel
+      else if(state.webSockets[action.channel]) {
+        state.webSockets[action.channel].close()
+      }
+      return {...state}
+    case 'websocketOpen':
+      state.channels[action.channel][0] = false
+      return {...state}
+    case 'websocketClose':
+      if(action.channel === state.client) 
+        state.client = null
+      state.channels[action.channel][0] = false
+      state.channels[action.channel].splice(1, 1);
+      state.webSockets[action.channel] = null
+      return {...state}
+    default:
+      throw new Error();
+  }
+}
+
 function App() {
-  const [clients, setClients] = useState({})
-  const [client, setClient] = useState({name: null})
   const [message, setMessage] = useState({popup: false, message: "", type: "error"})
-  const [chatRooms, setChatRooms] = useState([])
   const [authorization, setAuthorization] = useState({is: true, message: ""})
-  const [radio, setRadio] = useState(null);
-  const [checked, setChecked] = useState([]);
-  const [force, setForce] = useState(0)
+  const [channels, channelsDispatch] = useReducer(channelsReducer, channelsInit)
 
   useEffect(() => {
     getChannels()
@@ -68,51 +130,14 @@ function App() {
   const getChannels = () => {
     axios.get("/channels").then(response => {
       if(response.data.channels != null) {
-        let newChannels = {}
-        response.data.channels.forEach(channel => {
-          newChannels[channel] = [false]
-        });
-        Object.assign(newChannels, checked)
-        setChecked(newChannels)
-        setChatRooms(response.data.channels)
+        channelsDispatch({type: 'setChannels', channels: response.data.channels})
       } else {
-        setChatRooms(false)
+        channelsDispatch({type: 'setChannels', channels: false})
       }
     }).catch(error => {
-      setChatRooms(false)
+      channelsDispatch({type: 'setChannels', channels: false})
       setMessage({popup: true, message: "Sin conexión!", type: "error"});
     })
-  }
-
-  const send = () => {
-    if(clients[client.name] != null && clients[client.name].readyState === 1) {
-      clients[client.name].send(
-        JSON.stringify({
-          email: "react@react.com",
-          username: "react",
-          message: document.getElementById("message").value,
-          channel: client.name
-      }))
-      setMessage({popup: false, message: "", type: "error"});
-    } else if(client.name == null) {
-      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
-    } else if (clients[client.name] == null) {
-      checked[client.name] = [false]
-      client.name = null
-      setClient(client)
-      setRadio(null)
-      setChecked(checked)
-      setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
-    } else if (client.name != null && clients[client.name].readyState !== 1) {
-      checked[client.name] = [false]
-      client.name = null
-      setChecked(checked)
-      setRadio(null)
-      setClient(client)
-      setMessage({popup: true, message: "Canal fuera de línea ", type: "error"});
-    } else {
-      setMessage({popup: true, message: "No hay canal suscrito o válido", type: "error"});
-    }
   }
 
   const newChannel = () => {
@@ -126,77 +151,13 @@ function App() {
     })
   }
 
-  const connetServer =  (channel, close) => {
-    if (clients[channel] == null) {
-      setClients(prevState => {
-        if (prevState[channel] == null) {
-          let newConnection =  new W3CWebSocket(`ws${secure}://${domain}/ws/${channel}`);
+  const handleClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
 
-          newConnection.onopen = () => {
-            checked[channel][0] = false
-            newConnection.name = channel
-            console.log('WebSocket Client Connected');
-            setChecked(checked)
-            setForce(force+1)
-          };
-          newConnection.onmessage = (message) => {
-            console.log(message.data);
-            const data = JSON.parse(message.data)
-            serviceWorker.sendNotification(data.message)
-          };
-          newConnection.onerror = () => {
-            shutDownChannel(channel)
-            setMessage({popup: true, message: "Sin conexión al servidor!", type: "error"});
-            console.error("WebSocket error observed");
-          }
-          newConnection.onclose = event => {
-            shutDownChannel(event.target.name)
-            if(event.code !== 4000) {
-              setMessage({popup: true, message: "Error conexión al servidor!", type: "error"});
-            }
-            console.log("Closed!")
-          }
-          prevState[channel] = newConnection
-          return prevState
-        } else {
-          return prevState
-        }
-      })
-    } else if(close) {
-      clients[channel].close(4000)
-      if(clients[channel] === clients[client]) {
-        client.name = null
-        setRadio(null)
-        setClient(client)
-      }
-      delete clients[channel]
-    } else if(clients[channel].readyState !== 1) {
-      checked[channel][0] = false
-      checked[channel].splice(1, 1);
-      clients[channel] = null
-      setChecked(checked)
-      setClients(clients)
-      setForce(force+1)
-    }
-  }
-
-  const shutDownChannel = value => {
-    if(value === client.name) {
-      client.name = null
-      setRadio(null)
-      setClient(client)
-    }
-    if(checked[value]) {
-      checked[value][0] = false
-      checked[value].splice(1, 1);
-      setForce(prev=>{
-        setChecked(checked)
-        return prev+1
-      })
-    }
-    clients[value] = null
-    setClients(clients)
-  }
+    setMessage({popup: false, message: "", type: "error"});
+  };
 
   const push = () => {
     if(pushNotificationSupported) {
@@ -213,45 +174,22 @@ function App() {
     } else setAuthorization({is: false, message: "No soportado :("})
   }
 
-  const handleRadio = value => () => {
-    if(clients[value] != null && clients[value].readyState === 1) {
-      client.name = value
-      setClient(client)
-      setRadio(value)
+  const send = () => {
+    if(channels.webSockets[channels.client] && channels.webSockets[channels.client].readyState === 1) {
+      channels.webSockets[channels.client].send(
+        JSON.stringify({
+          email: "react@react.com",
+          username: "react",
+          message: document.getElementById("message").value,
+          channel: channels.client
+      }))
+      setMessage({popup: false, message: "", type: "error"});
+    } else if(channels.client == null) {
+      setMessage({popup: true, message: "No hay canal suscrito", type: "error"});
     } else {
-      checked[value] = [false]
-      if(client === value) {
-        client.name = null
-        setClient(client)
-        setRadio(null)
-      }
-      setChecked(checked)
-      setMessage({popup: true, message: "Canal sin suscripción", type: "error"});
+      setMessage({popup: true, message: "No hay canal válido", type: "error"});
     }
   }
-
-  const handleClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-
-    setMessage({popup: false, message: "", type: "error"});
-  };
-
-  const handleToggle = value => () => {
-    const currentIndex = checked[value].indexOf(value);
-    const newChecked = [...checked[value]];
-
-    if (currentIndex === -1) {
-      newChecked.push(value);
-      newChecked[0] = true;
-      checked[value] = newChecked
-      setChecked(checked);
-      connetServer(value)
-    } else {
-      connetServer(value, true)
-    }
-  };
 
   return (
     <Grid container spacing={1}>
@@ -274,11 +212,10 @@ function App() {
         <Grid item xs={12} sm={6} md={4} lg={3}>
           <Paper className={classes.form}>
             <ChatRooms
-              chatRooms={chatRooms}
-              radio={radio}
-              checked={checked}
-              handleRadio={handleRadio} 
-              handleToggle={handleToggle} />
+              channels={channels}
+              channelsDispatch={channelsDispatch}
+              serviceWorker={serviceWorker}
+              setMessage={setMessage} />
           </Paper>
         </Grid>
       </React.Fragment>
